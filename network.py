@@ -5,7 +5,7 @@ class Net(nn.Module):
     def __init__(self, num_classes):
         # 64 feature maps
         # Collapse time to 12 and frequency to 16 => (16, 12, 64)
-        super().__init__();
+        super().__init__()
         self.conv_stack = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=(3, 3), stride=(1, 1), padding="same"), # (128, 18, 32)
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2), padding=(0, 0)), # (64, 9, 32)
