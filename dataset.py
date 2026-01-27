@@ -86,7 +86,7 @@ class Dataset(Dataset):
                         break
                     
                     self.specs.append(torch.tensor(spec, dtype=torch.float32).unsqueeze(0))
-                    self.labels.append(torch.tensor(label, dtype=torch.long))
+                    self.labels.append(torch.tensor(label, dtype=torch.float32))  # Changed to float32 for multi-hot
                     total_samples += 1
             
             print(f"\n✓ Loaded {len(self.specs)} samples total")

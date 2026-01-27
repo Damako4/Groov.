@@ -9,14 +9,21 @@ from collections import Counter
 # Load dataset with sample limit for testing
 data = dataset.Dataset("groove/", max_samples=50000)
 
-# Check class distribution
-label_counts = Counter([label.item() for label in data.labels])
+# Check class distribution (for multi-label, count how many times each class appears)
+from collections import Counter
+label_counts = Counter()
+for label in data.labels:
+    for idx, val in enumerate(label):
+        if val > 0:
+            label_counts[idx] += 1
+
 print("\n" + "="*50)
-print("CLASS DISTRIBUTION:")
+print("CLASS DISTRIBUTION (Multi-Label):")
 print("="*50)
+total_samples = len(data.labels)
 for class_idx in range(dataset.NUM_CLASSES):
     count = label_counts.get(class_idx, 0)
-    percentage = 100 * count / len(data.labels)
+    percentage = 100 * count / total_samples
     print(f"{dataset.CLASS_NAMES[class_idx]:12s}: {count:5d} samples ({percentage:5.2f}%)")
 print("="*50)
 
@@ -45,14 +52,14 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"\nUsing device: {device}")
 
 model = Net(num_classes=11).to(device)
-criterion = nn.CrossEntropyLoss()
+criterion = nn.BCEWithLogitsLoss()  # Changed from CrossEntropyLoss for multi-label
 optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
 print(f"\nModel architecture:")
 print(model)
 print(f"\nTotal parameters: {sum(p.numel() for p in model.parameters())}")
 
-num_epochs = 50
+num_epochs = 15
 
 print(f"\nStarting training for {num_epochs} epochs...")
 print("="*70)
@@ -73,7 +80,8 @@ for epoch in range(num_epochs):
             print(f"  Input min: {inputs.min():.4f}, max: {inputs.max():.4f}")
             print(f"  Input mean: {inputs.mean():.4f}, std: {inputs.std():.4f}")
             print(f"  Labels shape: {labels.shape}")
-            print(f"  Unique labels in batch: {labels.unique().tolist()}")
+            print(f"  Sample multi-hot label: {labels[0].tolist()}")
+            print(f"  Drums in first sample: {[dataset.CLASS_NAMES[i] for i, v in enumerate(labels[0]) if v > 0]}")
 
         # Zero gradients
         optimizer.zero_grad()
@@ -86,11 +94,12 @@ for epoch in range(num_epochs):
         loss.backward()
         optimizer.step()
 
-        # Statistics
+        # Statistics (using sigmoid threshold for multi-label)
         running_loss += loss.item()
-        _, predicted = torch.max(outputs.data, 1)
+        predicted = (torch.sigmoid(outputs) > 0.5).float()
         total += labels.size(0)
-        correct += (predicted == labels).sum().item()
+        # Exact match accuracy (all labels must match)
+        correct += (predicted == labels).all(dim=1).sum().item()
     
     train_acc = 100 * correct / total
     avg_loss = running_loss / len(train_loader)
@@ -109,9 +118,9 @@ for epoch in range(num_epochs):
                 outputs = model(inputs)
                 loss = criterion(outputs, labels)
                 val_loss += loss.item()
-                _, predicted = torch.max(outputs.data, 1)
+                predicted = (torch.sigmoid(outputs) > 0.5).float()
                 total += labels.size(0)
-                correct += (predicted == labels).sum().item()
+                correct += (predicted == labels).all(dim=1).sum().item()
         
         val_acc = 100 * correct / total
         avg_val_loss = val_loss / len(test_loader)

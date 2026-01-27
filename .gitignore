@@ -4,3 +4,4 @@ groove/
 venv/
 diagram.drawio
 dataset_cache.pkl
+drum_classifier.pth
