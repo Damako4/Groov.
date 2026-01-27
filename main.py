@@ -18,7 +18,7 @@ train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model = Net(num_classes=10).to(device)
+model = Net(num_classes=11).to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 

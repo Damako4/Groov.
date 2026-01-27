@@ -3,3 +3,4 @@ groove/
 #separated/
 venv/
 diagram.drawio
+dataset_cache.pkl
