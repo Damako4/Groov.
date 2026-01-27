@@ -67,9 +67,9 @@ def get_audio_data(path, drum_mapping):
         pre_onset_samples = int(frame_length * pre_onset_ratio)
         
         # Add jitter for data augmentation (±5ms random shift)
-        jitter = np.random.randint(-int(0.005*sr), int(0.005*sr))
+        #jitter = np.random.randint(-int(0.005*sr), int(0.005*sr))
         
-        start_sample = onset_sample - pre_onset_samples + jitter
+        start_sample = onset_sample - pre_onset_samples # + jitter
         end_sample = start_sample + frame_length
         
         # Handle edge cases (beginning of audio)
@@ -94,8 +94,8 @@ def get_audio_data(path, drum_mapping):
         #print(f"Expected time bins: {(len(y_window) - n_fft) // hop_length + 1}")
 
         spec = helper.compute_spectrogram(y_window, sr, plot=False, n_mels=128, n_fft=n_fft, hop_length=hop_length)
-        spec_image = helper.spec_to_image(spec)
-        #spec_image = (spec_image - spec_image.mean()) / (spec_image.std() + 1e-6)
+        #spec_image = helper.spec_to_image(spec)
+        spec_image = (spec - spec.mean()) / (spec.std() + 1e-6)
 
 
         label = drum_mapping.get(note, None)

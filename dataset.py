@@ -46,7 +46,7 @@ CLASS_NAMES = [
 NUM_CLASSES = len(CLASS_NAMES)  # 11 classes 
 
 class Dataset(Dataset):
-    def __init__(self, path, cache_file="dataset_cache.pkl", force_reprocess=False):
+    def __init__(self, path, cache_file="dataset_cache.pkl", force_reprocess=False, max_samples=None):
         self.specs = []
         self.labels = []
         self.cache_file = cache_file
@@ -58,6 +58,13 @@ class Dataset(Dataset):
                 cache_data = pickle.load(f)
                 self.specs = cache_data['specs']
                 self.labels = cache_data['labels']
+            
+            # Limit samples if specified
+            if max_samples is not None and len(self.specs) > max_samples:
+                print(f"Limiting dataset from {len(self.specs)} to {max_samples} samples")
+                self.specs = self.specs[:max_samples]
+                self.labels = self.labels[:max_samples]
+            
             print(f"✓ Loaded {len(self.specs)} samples from cache")
         else:
             if force_reprocess:
@@ -65,12 +72,24 @@ class Dataset(Dataset):
             else:
                 print("No cache found. Loading dataset from scratch...")
             
+            total_samples = 0
             for path in tqdm.tqdm(helper.walk_fast(path)):
+                if max_samples is not None and total_samples >= max_samples:
+                    print(f"\nReached max_samples limit of {max_samples}")
+                    break
+                
                 specs, labels = preprocess.get_audio_data(path, DRUM_MAPPING)
+                
                 # Extend lists with all spectrograms from this file
                 for spec, label in zip(specs, labels):
+                    if max_samples is not None and total_samples >= max_samples:
+                        break
+                    
                     self.specs.append(torch.tensor(spec, dtype=torch.float32).unsqueeze(0))
                     self.labels.append(torch.tensor(label, dtype=torch.long))
+                    total_samples += 1
+            
+            print(f"\n✓ Loaded {len(self.specs)} samples total")
             
             # Save to cache
             print(f"Saving dataset to cache: {cache_file}")
