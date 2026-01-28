@@ -14,9 +14,7 @@ from tqdm import tqdm
 # - pre_onset_ratio: 30%
 # - STFT settings
 
-# TODO : 
-# - Now normalize per window, not globally.
-# - S_dB = (S_dB - np.mean(S_dB)) / (np.std(S_dB) + 1e-6)
+# TODO : Optimization steps
 # - Volume variation
 # - Negative samples (windows with no onsets)
 
