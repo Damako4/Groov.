@@ -8,10 +8,13 @@ class Net(nn.Module):
         super().__init__()
         self.conv_stack = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=(3, 3), stride=(1, 1), padding="same"), # (128, 18, 32)
+            nn.ReLU(),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2), padding=(0, 0)), # (64, 9, 32)
             nn.Conv2d(32, 64, kernel_size=(3, 3), stride=(1, 1), padding="same"), # (64, 9, 64)
+            nn.ReLU(),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2), padding=(0, 0)), # (32, 4, 64)
             nn.Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding="same"), # (32, 4, 64)
+            nn.ReLU(),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2), padding=(0, 0)) # (16, 2, 64)
         )
 
