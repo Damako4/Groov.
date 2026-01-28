@@ -60,45 +60,80 @@ def get_audio_data(path, drum_mapping):
     labels = []
 
     # Use processed_onsets (grouped simultaneous hits) instead of midi_onsets
+    positive_windows = []
+    window_centers = []
     for i, (time, notes) in enumerate(processed_onsets):
-        # Position onset closer to the start of the window
         onset_sample = int(time * sr)
         pre_onset_samples = int(frame_length * pre_onset_ratio)
-        
-        # Add jitter for data augmentation (±5ms random shift)
         jitter = np.random.randint(-int(0.005*sr), int(0.005*sr))
-        
         start_sample = onset_sample - pre_onset_samples + jitter
         end_sample = start_sample + frame_length
-        
-        # Handle edge cases (beginning of audio)
         if start_sample < 0:
             start_sample = 0
             end_sample = frame_length
         if end_sample > len(y):
             end_sample = len(y)
             start_sample = max(0, end_sample - frame_length)
-        
         y_window = y[start_sample:end_sample]
 
-        n_fft = 512
-        # For center=False: time_bins = floor((n_samples - n_fft) / hop_length) + 1
-        # We want 18 time bins, so: hop_length = (n_samples - n_fft) / 17
-        hop_length = (len(y_window) - n_fft) // 17
+        # --- Simple augmentations ---
+        aug_windows = [y_window]
+        # Gain (random between 0.7x and 1.3x)
+        gain = np.random.uniform(0.7, 1.3)
+        aug_windows.append(y_window * gain)
+        # Additive Gaussian noise (std 2% of signal std)
+        noise = np.random.normal(0, 0.02 * np.std(y_window), size=y_window.shape)
+        aug_windows.append(y_window + noise)
+        # Pitch shift (random between -1 and 1 semitones)
+        n_steps = np.random.uniform(-1, 1)
+        aug_windows.append(lb.effects.pitch_shift(y_window, sr, n_steps=n_steps))
+        # Time stretch (±10%)
+        stretch = np.random.uniform(0.9, 1.1)
+        try:
+            aug_windows.append(lb.effects.time_stretch(y_window, rate=stretch))
+        except Exception:
+            pass  # If too short for stretch, skip
 
-        spec = helper.compute_spectrogram(y_window, sr, plot=False, n_mels=128, n_fft=n_fft, hop_length=hop_length)
-        spec_image = (spec - spec.mean()) / (spec.std() + 1e-6)
-
-        # Create multi-hot label vector (11 classes)
         label_vector = np.zeros(11, dtype=np.float32)
         for note in notes:
             label_idx = drum_mapping.get(note, None)
             if label_idx is not None:
                 label_vector[label_idx] = 1.0
-        
-        # Only add if at least one valid drum was found
-        if label_vector.sum() > 0:
-            spectrograms.append(spec_image)
-            labels.append(label_vector)
+
+        for aug_win in aug_windows:
+            # Pad/crop to frame_length
+            if len(aug_win) < frame_length:
+                aug_win = np.pad(aug_win, (0, frame_length - len(aug_win)))
+            elif len(aug_win) > frame_length:
+                aug_win = aug_win[:frame_length]
+            n_fft = 512
+            hop_length = (len(aug_win) - n_fft) // 17
+            spec = helper.compute_spectrogram(aug_win, sr, plot=False, n_mels=128, n_fft=n_fft, hop_length=hop_length)
+            spec_image = (spec - spec.mean()) / (spec.std() + 1e-6)
+            if label_vector.sum() > 0:
+                spectrograms.append(spec_image)
+                labels.append(label_vector)
+                positive_windows.append((start_sample, end_sample))
+                window_centers.append((start_sample + end_sample) // 2)
+
+    # Add negative samples: 1 per positive sample
+    n_neg = len(positive_windows)
+    min_gap = int(0.05 * sr)  # 50ms gap from any positive window center
+    for _ in range(n_neg):
+        for _ in range(20):  # Try up to 20 times to find a valid negative
+            center = np.random.randint(frame_length//2, len(y) - frame_length//2)
+            # Check if this window overlaps any positive window (center at least min_gap away)
+            if all(abs(center - c) > (frame_length//2 + min_gap) for c in window_centers):
+                start_sample = center - frame_length//2
+                end_sample = start_sample + frame_length
+                y_window = y[start_sample:end_sample]
+                n_fft = 512
+                hop_length = (len(y_window) - n_fft) // 17
+                spec = helper.compute_spectrogram(y_window, sr, plot=False, n_mels=128, n_fft=n_fft, hop_length=hop_length)
+                spec_image = (spec - spec.mean()) / (spec.std() + 1e-6)
+                label_vector = np.zeros(11, dtype=np.float32)  # All zeros = no drum
+                spectrograms.append(spec_image)
+                labels.append(label_vector)
+                break
 
     return spectrograms, labels
